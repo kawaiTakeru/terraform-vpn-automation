@@ -1,1 +1,32 @@
+trigger: none
+pr: none
+
+pool:
+  name: Default  # ← Self-hosted Agent を指定（名前は環境に合わせて）
+
+variables:
+  TF_VERSION: '1.6.6'
+  TF_DIRECTORY: 'stage1-peering'
+
+stages:
+- stage: Stage1_Peering
+  displayName: 'VNet Peering Setup'
+  jobs:
+  - job: TerraformApply
+    displayName: 'Apply Peering Configuration'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.x'
+    
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - script: |
+        cd $(TF_DIRECTORY)
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply -auto-approve tfplan
+      displayName: 'Terraform Init/Plan/Apply'
 
