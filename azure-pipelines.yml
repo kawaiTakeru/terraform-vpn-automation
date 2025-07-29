@@ -81,3 +81,5 @@ stages:
       inputs:
         targetType: filePath
         filePath: stage3-package/package_and_notify.ps1
+      evn:
+        SLACK_WEBHOOK_URL: $(SLACK_WEBHOOK_URL)
