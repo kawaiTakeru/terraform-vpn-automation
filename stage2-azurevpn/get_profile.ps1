@@ -29,7 +29,6 @@ if (Test-Path $profileMetadata) {
     } else {
         Write-Error "profileUrl is empty. VPN Gateway から ZIP URL を取得できませんでした。"
     }
-
 } else {
     Write-Error "profile_metadata.json が生成されていません。"
 }
