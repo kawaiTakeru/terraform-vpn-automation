@@ -117,7 +117,7 @@ foreach ($pfx in $pfxList) {
     $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
     $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/zip")
     $multipart.Add($fileContent, "file", [System.IO.Path]::GetFileName($zipPath))
-    $multipart.Add((New-Object System.Net.Http.StringContent($channelId)), "channels")
+    $multipart.Add((New-Object System.Net.Http.StringContent($channelId)), "channel")
 
     $httpClient.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
 
