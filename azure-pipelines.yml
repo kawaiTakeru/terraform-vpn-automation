@@ -14,7 +14,7 @@ stages:
   displayName: '① PFX証明書生成'
   jobs:
   - job: GeneratePFX
-    displayName: 'OpenSSLで.taro.pfx作成'
+    displayName: 'OpenSSLで taro.pfx 作成'
     steps:
     - task: PowerShell@2
       displayName: 'Generate .pfx from vars.json'
@@ -36,7 +36,7 @@ stages:
   dependsOn: Stage1_PFX
   jobs:
   - job: GetAzureVPN
-    displayName: 'VPN Gatewayから .azurevpn ZIPを取得'
+    displayName: 'VPN Gateway から azurevpnconfig.xml を含む ZIP を取得'
     steps:
     - task: AzureCLI@2
       displayName: 'Get VPN profile ZIP via Azure CLI'
@@ -60,7 +60,7 @@ stages:
   dependsOn: Stage2_AzureVPN
   jobs:
   - job: NotifySlack
-    displayName: 'pfx + .azurevpn を ZIP にまとめて通知'
+    displayName: 'pfx + azurevpnconfig.xml を ZIP にまとめて通知'
     steps:
     # ✅ 追加：PFXもダウンロード
     - task: DownloadBuildArtifacts@0
