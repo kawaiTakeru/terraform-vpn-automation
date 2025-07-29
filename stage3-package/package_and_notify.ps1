@@ -36,7 +36,7 @@ Get-ChildItem $unzipDir -Recurse | ForEach-Object {
 }
 Write-Host ""
 
-# === [STEP] Locate .pfx files ===
+# === [STEP] Searching for .pfx files ===
 Write-Host "=== [STEP] Searching for .pfx files..."
 $pfxList = Get-ChildItem "$certs/*.pfx"
 if (-not $pfxList) {
@@ -75,4 +75,50 @@ foreach ($pfx in $pfxList) {
 
     Write-Host "[INFO] Slack Webhook disabled. Notification skipped."
     Write-Host ""
+}
+
+# === [STEP] Slack DM test message ===
+Write-Host "=== [STEP] Sending Slack DM test message..."
+
+$token = $env:SLACK_BOT_TOKEN
+$email = "t-kawai@bfts.co.jp"
+
+$response = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Method Get `
+    -Body @{ email = $email }
+
+if (-not $response.ok) {
+    Write-Error "[ERROR] Failed to lookup Slack user: $($response.error)"
+    exit 1
+}
+
+$userId = $response.user.id
+Write-Host "[OK] Found Slack user ID: $userId"
+
+$dm = Invoke-RestMethod -Uri "https://slack.com/api/conversations.open" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body (@{ users = $userId } | ConvertTo-Json -Depth 10)
+
+if (-not $dm.ok) {
+    Write-Error "[ERROR] Failed to open DM: $($dm.error)"
+    exit 1
+}
+
+$channelId = $dm.channel.id
+Write-Host "[OK] Opened DM channel: $channelId"
+
+$message = "✅ Slack DM test from Azure Pipeline (user: $email)"
+$response = Invoke-RestMethod -Uri "https://slack.com/api/chat.postMessage" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body (@{ channel = $channelId; text = $message } | ConvertTo-Json -Depth 10)
+
+if ($response.ok) {
+    Write-Host "[✅] Slack DM sent successfully to $email"
+} else {
+    Write-Error "[ERROR] Failed to send Slack DM: $($response.error)"
 }
