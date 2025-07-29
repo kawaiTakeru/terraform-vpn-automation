@@ -104,7 +104,7 @@ foreach ($pfx in $pfxList) {
         Write-Error "[ERROR] Failed to open DM: $($dmResp.error)"
         continue
     }
-    $channelId = $dmResp.channel.id
+    $channelId = "@t-kawai"
     Write-Host "[OK] DM channel: $channelId"
 
     # ③ Upload ZIP file using multipart/form-data
