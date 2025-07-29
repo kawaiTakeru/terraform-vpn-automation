@@ -55,5 +55,6 @@ foreach ($pfx in $pfxList) {
     # 📣 Slack 通知
     $payload = @{ text = "✅ `$userName` 用 VPNパッケージを作成しました: $userName" } | ConvertTo-Json -Compress
     Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
+
     Write-Host "📤 Slack 通知を送信しました。"
 }
