@@ -7,11 +7,9 @@ pool:
 variables:
   - name: System.Debug
     value: 'true'
-  # 🔻 削除：循環参照を避けるため
-  # - name: SLACK_WEBHOOK_URL
-  #   value: $(SLACK_WEBHOOK_URL)
 
 stages:
+# ① PFX証明書生成
 - stage: Stage1_PFX
   displayName: '① PFX証明書生成'
   jobs:
@@ -24,6 +22,7 @@ stages:
         targetType: filePath
         filePath: stage1-pfx/generate_cert.ps1
 
+# ② Azure VPN設定ファイル取得
 - stage: Stage2_AzureVPN
   displayName: '② Azure VPN設定ファイル取得'
   dependsOn: Stage1_PFX
@@ -34,11 +33,20 @@ stages:
     - task: AzureCLI@2
       displayName: 'Get VPN profile ZIP via Azure CLI'
       inputs:
-        azureSubscription: 'AzureRM-vpn-connection'  # ✅ 先ほど作成したService Connection名
+        azureSubscription: 'AzureRM-vpn-connection'  # ✅ Service Connection 名
         scriptType: ps
         scriptLocation: scriptPath
         scriptPath: stage2-azurevpn/get_profile.ps1
 
+    # ✅ 追加：Stage3用にZIPを公開
+    - task: PublishBuildArtifacts@1
+      displayName: '📤 Publish VPN profile.zip'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/vpn'
+        ArtifactName: 'vpn'
+        publishLocation: 'Container'
+
+# ③ ZIP化 & Slack通知
 - stage: Stage3_ZipAndNotify
   displayName: '③ ZIP化 & Slack通知'
   dependsOn: Stage2_AzureVPN
@@ -46,6 +54,13 @@ stages:
   - job: NotifySlack
     displayName: 'pfx + .azurevpn を ZIP にまとめて通知'
     steps:
+    # ✅ 追加：ZIPアーティファクトをダウンロード
+    - task: DownloadBuildArtifacts@0
+      displayName: '📥 Download VPN artifact'
+      inputs:
+        artifactName: 'vpn'
+        downloadPath: '$(Build.ArtifactStagingDirectory)/vpn'
+
     - task: PowerShell@2
       displayName: 'Package and Notify'
       inputs:
