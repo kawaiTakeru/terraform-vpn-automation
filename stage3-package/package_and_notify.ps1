@@ -1,4 +1,3 @@
-
 # === [CONFIG] Paths ===
 $certs    = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs/certs"
 $vpnZip   = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpn/vpnprofile.zip"
@@ -118,7 +117,6 @@ foreach ($pfx in $pfxList) {
     $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
     $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/zip")
     $multipart.Add($fileContent, "file", [System.IO.Path]::GetFileName($zipPath))
-
     $multipart.Add((New-Object System.Net.Http.StringContent($channelId)), "channels")
 
     $httpClient.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
