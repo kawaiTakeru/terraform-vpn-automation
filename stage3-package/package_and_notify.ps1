@@ -5,77 +5,103 @@ $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
 
-Write-Host "Certificate directory: $certs"
-Write-Host "VPN ZIP file: $vpnZip"
-Write-Host "Output directory: $outDir"
+Write-Host "=== [INFO] Directory paths ==="
+Write-Host "Certificate directory : $certs"
+Write-Host "VPN ZIP file          : $vpnZip"
+Write-Host "Output directory      : $outDir"
+Write-Host ""
 
 # === Create output directory ===
+Write-Host "=== [STEP] Creating output directory..."
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
+# === Debug: List VPN ZIP directory contents before checking existence ===
+$vpnDir = Split-Path $vpnZip
+Write-Host "=== [DEBUG] Listing contents of VPN directory: $vpnDir"
+Get-ChildItem -Recurse $vpnDir | ForEach-Object {
+    Write-Host " - $($_.FullName)"
+}
+Write-Host ""
+
 # === Validate VPN ZIP exists ===
+Write-Host "=== [CHECK] Checking if VPN ZIP exists..."
 if (-not (Test-Path $vpnZip)) {
-    Write-Error "VPN ZIP file not found: $vpnZip"
+    Write-Error "[ERROR] VPN ZIP file not found: $vpnZip"
     exit 1
 }
+Write-Host "[OK] VPN ZIP file found: $vpnZip"
+Write-Host ""
 
 # === Unzip the VPN ZIP ===
-Write-Host "Extracting VPN ZIP: $vpnZip"
+Write-Host "=== [STEP] Extracting VPN ZIP..."
 Expand-Archive -Path $vpnZip -DestinationPath $unzipDir -Force
+Write-Host "[OK] Extracted to: $unzipDir"
+Write-Host ""
 
 # === List extracted files ===
-Write-Host "Extracted files:"
+Write-Host "=== [DEBUG] Listing extracted files..."
 Get-ChildItem $unzipDir -Recurse | ForEach-Object {
-    Write-Host " - $_"
+    Write-Host " - $($_.FullName)"
 }
+Write-Host ""
 
-# === Process each PFX file ===
+# === Find all PFX files ===
+Write-Host "=== [STEP] Finding .pfx files..."
 $pfxList = Get-ChildItem "$certs/*.pfx"
 if (-not $pfxList) {
-    Write-Error "No .pfx files found in: $certs"
+    Write-Error "[ERROR] No .pfx files found in: $certs"
     exit 1
 }
+Write-Host "[OK] Found $($pfxList.Count) .pfx file(s)"
+Write-Host ""
 
+# === Process each PFX file ===
 foreach ($pfx in $pfxList) {
     $userName = $pfx.BaseName
-    Write-Host "User: $userName"
-    Write-Host "PFX file: $($pfx.FullName)"
+    Write-Host "=== [PROCESS] User: $userName ==="
+    Write-Host "PFX file path      : $($pfx.FullName)"
 
-    # === Get the .azurevpn file ===
+    # === Find corresponding .azurevpn file ===
     $azurevpn = Get-ChildItem $unzipDir -Recurse -Filter "*.azurevpn" | Select-Object -First 1
     if (-not $azurevpn) {
-        Write-Error ".azurevpn file not found in: $unzipDir"
+        Write-Error "[ERROR] .azurevpn file not found in: $unzipDir"
         continue
     }
+    Write-Host ".azurevpn file path: $($azurevpn.FullName)"
 
-    Write-Host ".azurevpn file: $($azurevpn.FullName)"
-
-    # === Confirm both files are readable ===
+    # === Confirm both files exist and are readable ===
     if (-not (Test-Path $pfx.FullName)) {
-        Write-Error "PFX file does not exist: $($pfx.FullName)"
+        Write-Error "[ERROR] PFX file missing: $($pfx.FullName)"
         continue
     }
     if (-not (Test-Path $azurevpn.FullName)) {
-        Write-Error ".azurevpn file does not exist: $($azurevpn.FullName)"
+        Write-Error "[ERROR] .azurevpn file missing: $($azurevpn.FullName)"
         continue
     }
 
     try {
         $null = Get-Content $pfx.FullName -ErrorAction Stop
         $null = Get-Content $azurevpn.FullName -ErrorAction Stop
-        Write-Host "Confirmed: Both files are readable."
+        Write-Host "[OK] Verified both files are readable."
     } catch {
-        Write-Error "Cannot read files: $($_.Exception.Message)"
+        Write-Error "[ERROR] File read failed: $($_.Exception.Message)"
         continue
     }
 
-    # === Create user-specific ZIP package ===
+    # === Create ZIP package ===
     $zipPath = "$outDir/${userName}_vpn_package.zip"
     Write-Host "Creating ZIP package: $zipPath"
     Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
+    Write-Host "[OK] Package created: $zipPath"
 
     # === Send Slack notification ===
-    $payload = @{ text = "[OK] VPN package for $userName has been created." } | ConvertTo-Json -Compress
-    Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
+    if ($slackWebhook) {
+        $payload = @{ text = "[OK] VPN package for $userName has been created." } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
+        Write-Host "[OK] Slack notification sent."
+    } else {
+        Write-Warning "[WARN] Slack webhook URL not set. Skipping notification."
+    }
 
-    Write-Host "Slack notification sent."
+    Write-Host ""
 }
