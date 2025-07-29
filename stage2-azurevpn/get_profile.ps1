@@ -16,6 +16,9 @@ $rawJson = az network vnet-gateway vpn-client generate `
   --authentication-method EAPTLS `
   --output json
 
+Write-Host "🧪 Step 2.5: Raw JSON output from az command"
+Write-Host $rawJson
+
 Write-Host "📄 Step 3: Saving JSON output to files"
 $rawJson | Out-File -Encoding utf8 $rawOutput
 $rawJson | Out-File -Encoding utf8 $profileMetadata
