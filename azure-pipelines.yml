@@ -7,8 +7,9 @@ pool:
 variables:
   - name: System.Debug
     value: 'true'
-  - name: SLACK_WEBHOOK_URL
-    value: $(SLACK_WEBHOOK_URL)  # ← パイプラインに Secret 登録されている前提
+  # 🔻 削除：循環参照を避けるため
+  # - name: SLACK_WEBHOOK_URL
+  #   value: $(SLACK_WEBHOOK_URL)
 
 stages:
 - stage: Stage1_PFX
@@ -33,7 +34,7 @@ stages:
     - task: AzureCLI@2
       displayName: 'Get VPN profile ZIP via Azure CLI'
       inputs:
-        azureSubscription: 'AzureRM-vpn-connection'  # ⚠️ Azureへのサービス接続名に変更
+        azureSubscription: 'AzureRM-vpn-connection'  # ✅ 先ほど作成したService Connection名
         scriptType: ps
         scriptLocation: scriptPath
         scriptPath: stage2-azurevpn/get_profile.ps1
