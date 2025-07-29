@@ -5,11 +5,27 @@ $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
 
+# === [TEST] Slack通知テスト（Webhook動作確認） ===
+if ($slackWebhook) {
+    $testPayload = @{ text = "📣 Slack通知テスト：Pipelineからの送信テスト成功（WebHook確認）" } | ConvertTo-Json -Compress
+    try {
+        Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $testPayload
+        Write-Host "[TEST] Slack Webhook test message sent successfully."
+    } catch {
+        Write-Warning "[WARN] Slack Webhook test failed: $($_.Exception.Message)"
+    }
+} else {
+    Write-Warning "[WARN] SLACK_WEBHOOK_URL is not set. Skipping Slack test message."
+}
+Write-Host ""
+
 Write-Host "=== [INFO] Directory paths ==="
 Write-Host "Certificate directory : $certs"
 Write-Host "VPN ZIP file          : $vpnZip"
 Write-Host "Output directory      : $outDir"
 Write-Host ""
+
+# ...（後続の処理はそのまま）
 
 # === [STEP] Create output directory ===
 Write-Host "=== [STEP] Creating output directory..."
