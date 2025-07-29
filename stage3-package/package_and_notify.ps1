@@ -5,9 +5,9 @@ $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
 
-# === [TEST] Slack通知テスト（Webhook動作確認） ===
+# === [TEST] Slack Webhook test ===
 if ($slackWebhook) {
-    $testPayload = @{ text = "📣 Slack通知テスト：Pipelineからの送信テスト成功（WebHook確認）" } | ConvertTo-Json -Compress
+    $testPayload = @{ text = "Slack webhook test message: pipeline notification check." } | ConvertTo-Json -Compress
     try {
         Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $testPayload
         Write-Host "[TEST] Slack Webhook test message sent successfully."
