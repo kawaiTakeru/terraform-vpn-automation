@@ -37,7 +37,7 @@ Get-ChildItem $unzipDir -Recurse | ForEach-Object {
 Write-Host ""
 
 # === [STEP] Locate .pfx files ===
-Write-Host "=== [STEP] Finding .pfx files..."
+Write-Host "=== [STEP] Searching for .pfx files..."
 $pfxList = Get-ChildItem "$certs/*.pfx"
 if (-not $pfxList) {
     Write-Error "[ERROR] No .pfx files found in: $certs"
@@ -46,33 +46,33 @@ if (-not $pfxList) {
 Write-Host "[OK] Found $($pfxList.Count) .pfx file(s)"
 Write-Host ""
 
-# === [STEP] Process each PFX file ===
+# === [STEP] Process each .pfx file ===
 foreach ($pfx in $pfxList) {
     $userName = $pfx.BaseName
     Write-Host "=== [PROCESS] User: $userName ==="
-    Write-Host "PFX file path      : $($pfx.FullName)"
+    Write-Host "PFX file path        : $($pfx.FullName)"
 
     $azurevpn = Get-Item "$unzipDir/AzureVPN/azurevpnconfig.xml" -ErrorAction SilentlyContinue
     if (-not $azurevpn) {
         Write-Error "[ERROR] azurevpnconfig.xml not found in: $unzipDir\AzureVPN"
         continue
     }
-    Write-Host "VPN config file path: $($azurevpn.FullName)"
+    Write-Host "VPN config file path : $($azurevpn.FullName)"
 
     try {
         $null = Get-Content $pfx.FullName -ErrorAction Stop
         $null = Get-Content $azurevpn.FullName -ErrorAction Stop
         Write-Host "[OK] Verified both files are readable."
     } catch {
-        Write-Error "[ERROR] File read failed: $($_.Exception.Message)"
+        Write-Error "[ERROR] Failed to read files: $($_.Exception.Message)"
         continue
     }
 
     $zipPath = "$outDir/${userName}_vpn_package.zip"
-    Write-Host "Creating ZIP package: $zipPath"
+    Write-Host "Creating ZIP package : $zipPath"
     Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
-    Write-Host "[OK] Package created: $zipPath"
+    Write-Host "[OK] Package created : $zipPath"
 
-    Write-Host "[INFO] Slack Webhook 無効化中。通知スキップ。"
+    Write-Host "[INFO] Slack Webhook disabled. Notification skipped."
     Write-Host ""
 }
