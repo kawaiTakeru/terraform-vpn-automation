@@ -4,10 +4,8 @@ $outputDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn"
 $profileMetadata = "$outputDir/profile_metadata.json"
 $profileZip = "$outputDir/vpnprofile.zip"
 
-# 出力先フォルダ作成
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-# VPN クライアント構成メタデータ取得（profileUrl が含まれる JSON）
 az network vnet-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
@@ -16,7 +14,6 @@ az network vnet-gateway vpn-client generate `
   --output json `
   > $profileMetadata
 
-# JSON が存在していれば処理実行
 if (Test-Path $profileMetadata) {
     $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
 
