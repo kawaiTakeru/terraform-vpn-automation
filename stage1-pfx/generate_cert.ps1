@@ -1,43 +1,107 @@
-# === [CONFIG] OpenSSL binary path ===
-$opensslPath = "C:\Program Files\OpenSSL-Win64\bin\openssl.exe"
+# === Path settings ===
+$certs        = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs/certs"
+$vpnZip       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpn/vpnprofile.zip"
+$outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
+$unzipDir     = "$outDir/unzipped"
+$slackWebhook = $env:SLACK_WEBHOOK_URL
 
-# === [CONFIG] Paths ===
-$certDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
-$jsonFile = "$env:BUILD_SOURCESDIRECTORY/stage1-pfx/vars.json"
+Write-Host "=== [INFO] Directory paths ==="
+Write-Host "Certificate directory : $certs"
+Write-Host "VPN ZIP file          : $vpnZip"
+Write-Host "Output directory      : $outDir"
+Write-Host ""
 
-Write-Host "=== [INFO] Certificate output directory: $certDir"
-Write-Host "=== [INFO] Input JSON file: $jsonFile"
+# === Create output directory ===
+Write-Host "=== [STEP] Creating output directory..."
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# === [STEP] Create output directory ===
-New-Item -ItemType Directory -Force -Path $certDir | Out-Null
-
-# === [STEP] Read JSON and generate certificates ===
-$json = Get-Content $jsonFile | ConvertFrom-Json
-
-foreach ($user in $json.users) {
-    $userName = $user.name
-    $password = $user.password
-
-    $keyFile = "$certDir/$userName.key"
-    $csrFile = "$certDir/$userName.csr"
-    $crtFile = "$certDir/$userName.crt"
-    $pfxFile = "$certDir/$userName.pfx"
-
-    Write-Host ">>> Generating certificate for: $userName"
-
-    # --- Generate private key ---
-    & $opensslPath genrsa -out $keyFile 2048
-
-    # --- Generate CSR ---
-    & $opensslPath req -new -key $keyFile -out $csrFile -subj "/CN=$userName"
-
-    # --- Generate self-signed certificate ---
-    & $opensslPath x509 -req -in $csrFile -signkey $keyFile -out $crtFile -days 365
-
-    # --- Generate .pfx with password ---
-    & $opensslPath pkcs12 -export -out $pfxFile -inkey $keyFile -in $crtFile -password pass:$password
-
-    Write-Host "[OK] $userName.pfx created → $pfxFile"
+# === Debug: List VPN ZIP directory contents before checking existence ===
+$vpnDir = Split-Path $vpnZip
+Write-Host "=== [DEBUG] Listing contents of VPN directory: $vpnDir"
+Get-ChildItem -Recurse $vpnDir | ForEach-Object {
+    Write-Host " - $($_.FullName)"
 }
+Write-Host ""
 
-Write-Host "=== [SUCCESS] All certificates generated successfully ==="
+# === Validate VPN ZIP exists ===
+Write-Host "=== [CHECK] Checking if VPN ZIP exists..."
+if (-not (Test-Path $vpnZip)) {
+    Write-Error "[ERROR] VPN ZIP file not found: $vpnZip"
+    exit 1
+}
+Write-Host "[OK] VPN ZIP file found: $vpnZip"
+Write-Host ""
+
+# === Unzip the VPN ZIP ===
+Write-Host "=== [STEP] Extracting VPN ZIP..."
+Expand-Archive -Path $vpnZip -DestinationPath $unzipDir -Force
+Write-Host "[OK] Extracted to: $unzipDir"
+Write-Host ""
+
+# === List extracted files ===
+Write-Host "=== [DEBUG] Listing extracted files..."
+Get-ChildItem $unzipDir -Recurse | ForEach-Object {
+    Write-Host " - $($_.FullName)"
+}
+Write-Host ""
+
+# === Find all PFX files ===
+Write-Host "=== [STEP] Finding .pfx files..."
+$pfxList = Get-ChildItem "$certs/*.pfx"
+if (-not $pfxList) {
+    Write-Error "[ERROR] No .pfx files found in: $certs"
+    exit 1
+}
+Write-Host "[OK] Found $($pfxList.Count) .pfx file(s)"
+Write-Host ""
+
+# === Process each PFX file ===
+foreach ($pfx in $pfxList) {
+    $userName = $pfx.BaseName
+    Write-Host "=== [PROCESS] User: $userName ==="
+    Write-Host "PFX file path      : $($pfx.FullName)"
+
+    # === Use azurevpnconfig.xml instead of .azurevpn ===
+    $azurevpn = Get-Item "$unzipDir/AzureVPN/azurevpnconfig.xml" -ErrorAction SilentlyContinue
+    if (-not $azurevpn) {
+        Write-Error "[ERROR] azurevpnconfig.xml not found in: $unzipDir\AzureVPN"
+        continue
+    }
+    Write-Host "VPN config file path: $($azurevpn.FullName)"
+
+    # === Confirm both files exist and are readable ===
+    if (-not (Test-Path $pfx.FullName)) {
+        Write-Error "[ERROR] PFX file missing: $($pfx.FullName)"
+        continue
+    }
+    if (-not (Test-Path $azurevpn.FullName)) {
+        Write-Error "[ERROR] VPN config file missing: $($azurevpn.FullName)"
+        continue
+    }
+
+    try {
+        $null = Get-Content $pfx.FullName -ErrorAction Stop
+        $null = Get-Content $azurevpn.FullName -ErrorAction Stop
+        Write-Host "[OK] Verified both files are readable."
+    } catch {
+        Write-Error "[ERROR] File read failed: $($_.Exception.Message)"
+        continue
+    }
+
+    # === Create ZIP package ===
+    $zipPath = "$outDir/${userName}_vpn_package.zip"
+    Write-Host "Creating ZIP package: $zipPath"
+    Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
+    Write-Host "[OK] Package created: $zipPath"
+
+    # === Send Slack notification ===
+    if ($slackWebhook) {
+        $payload = @{ text = "[OK] VPN package for $userName has been created." } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
+        Write-Host "[OK] Slack notification sent."
+    } else {
+        Write-Warning "[WARN] Slack webhook URL not set. Skipping notification."
+    }
+
+    Write-Host ""
+}
