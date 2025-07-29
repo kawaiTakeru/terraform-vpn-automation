@@ -1,7 +1,14 @@
 # variables
 $opensslPath = "openssl"  # PATHが通っていればコマンド名のみでOK
-$certDir = "$(Build.ArtifactStagingDirectory)/certs"
-$jsonFile = "$(System.DefaultWorkingDirectory)/stage1-pfx/vars.json"
+# 正しい環境変数の取得
+$certDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
+$jsonFile = "$env:BUILD_SOURCESDIRECTORY/stage1-pfx/vars.json"
+
+# 出力ディレクトリ作成
+New-Item -ItemType Directory -Force -Path $certDir | Out-Null
+
+# JSONロードして証明書生成（以下略）
+
 
 # create output dir
 New-Item -ItemType Directory -Force -Path $certDir | Out-Null
