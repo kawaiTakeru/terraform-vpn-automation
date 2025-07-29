@@ -52,7 +52,7 @@ stages:
         ArtifactName: 'vpn'
         publishLocation: 'Container'
 
-# ③ ZIP化 & Slack通知（Webhook削除版）
+# ③ ZIP化 & Slack通知（Webhook削除＋Slack Botトークン対応版）
 - stage: Stage3_ZipAndNotify
   displayName: '③ ZIP化 & Slack通知'
   dependsOn: Stage2_AzureVPN
@@ -73,7 +73,9 @@ stages:
         downloadPath: '$(Build.ArtifactStagingDirectory)/vpn'
 
     - task: PowerShell@2
-      displayName: 'Package (Slack未通知版)'
+      displayName: 'Package (Slack通知テスト付き)'
       inputs:
         targetType: filePath
         filePath: stage3-package/package_and_notify.ps1
+      env:
+        SLACK_BOT_TOKEN: $(SLACK_BOT_TOKEN)  # ✅ 追加：Slack API トークンを環境変数で渡す
