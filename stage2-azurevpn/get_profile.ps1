@@ -20,7 +20,7 @@ New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
     --output json `
     > $profileMetadata
 
-# ZIP URLの取得
+# ZIP URLの取得とダウンロード
 if (Test-Path $profileMetadata) {
     $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
 
