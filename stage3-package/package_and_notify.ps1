@@ -1,6 +1,6 @@
 # === Path settings ===
 $certs        = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
-$vpnZip       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpnprofile.zip"
+$vpnZip = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpn/vpnprofile.zip"
 $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
