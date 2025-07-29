@@ -1,60 +1,81 @@
-# パス設定
+# === Path settings ===
 $certs        = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
 $vpnZip       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpnprofile.zip"
 $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
 
-Write-Host "証明書ディレクトリ: $certs"
-Write-Host "VPN ZIP ファイル: $vpnZip"
-Write-Host "出力先ディレクトリ: $outDir"
+Write-Host "Certificate directory: $certs"
+Write-Host "VPN ZIP file: $vpnZip"
+Write-Host "Output directory: $outDir"
 
-# 出力ディレクトリ作成
+# === Create output directory ===
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# VPN ZIPファイルの存在確認
+# === Validate VPN ZIP exists ===
 if (-not (Test-Path $vpnZip)) {
-    Write-Error "VPN ZIP が見つかりません: $vpnZip"
+    Write-Error "VPN ZIP file not found: $vpnZip"
     exit 1
 }
 
-# 展開
-Write-Host "VPN ZIP を展開します: $vpnZip"
+# === Unzip the VPN ZIP ===
+Write-Host "Extracting VPN ZIP: $vpnZip"
 Expand-Archive -Path $vpnZip -DestinationPath $unzipDir -Force
 
-# 展開ファイル確認
-Write-Host "展開されたファイル一覧:"
+# === List extracted files ===
+Write-Host "Extracted files:"
 Get-ChildItem $unzipDir -Recurse | ForEach-Object {
     Write-Host " - $_"
 }
 
-# 各ユーザーの PFX を処理
+# === Process each PFX file ===
 $pfxList = Get-ChildItem "$certs/*.pfx"
 if (-not $pfxList) {
-    Write-Error ".pfx ファイルが見つかりません: $certs"
+    Write-Error "No .pfx files found in: $certs"
     exit 1
 }
 
 foreach ($pfx in $pfxList) {
     $userName = $pfx.BaseName
-    Write-Host "対象ユーザー: $userName"
-    Write-Host "PFXファイル: $($pfx.FullName)"
+    Write-Host "User: $userName"
+    Write-Host "PFX file: $($pfx.FullName)"
 
+    # === Get the .azurevpn file ===
     $azurevpn = Get-ChildItem $unzipDir -Recurse -Filter "*.azurevpn" | Select-Object -First 1
     if (-not $azurevpn) {
-        Write-Error ".azurevpn ファイルが見つかりませんでした in $unzipDir"
+        Write-Error ".azurevpn file not found in: $unzipDir"
         continue
     }
 
-    Write-Host ".azurevpn ファイル: $($azurevpn.FullName)"
+    Write-Host ".azurevpn file: $($azurevpn.FullName)"
 
+    # === Confirm both files are readable ===
+    if (-not (Test-Path $pfx.FullName)) {
+        Write-Error "PFX file does not exist: $($pfx.FullName)"
+        continue
+    }
+    if (-not (Test-Path $azurevpn.FullName)) {
+        Write-Error ".azurevpn file does not exist: $($azurevpn.FullName)"
+        continue
+    }
+
+    try {
+        $null = Get-Content $pfx.FullName -ErrorAction Stop
+        $null = Get-Content $azurevpn.FullName -ErrorAction Stop
+        Write-Host "Confirmed: Both files are readable."
+    } catch {
+        Write-Error "Cannot read files: $($_.Exception.Message)"
+        continue
+    }
+
+    # === Create user-specific ZIP package ===
     $zipPath = "$outDir/${userName}_vpn_package.zip"
-    Write-Host "ZIP作成: $zipPath"
+    Write-Host "Creating ZIP package: $zipPath"
     Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
 
-    # Slack 通知
-    $payload = @{ text = "$userName 用 VPNパッケージを作成しました" } | ConvertTo-Json -Compress
+    # === Send Slack notification ===
+    $payload = @{ text = "[OK] VPN package for $userName has been created." } | ConvertTo-Json -Compress
     Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
 
-    Write-Host "Slack 通知を送信しました。"
+    Write-Host "Slack notification sent."
 }
