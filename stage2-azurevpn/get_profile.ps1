@@ -4,8 +4,10 @@ $outputDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn"
 $profileMetadata = "$outputDir/profile_metadata.json"
 $profileZip = "$outputDir/vpnprofile.zip"
 
+# Create output directory
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
+# Generate VPN client profile metadata JSON
 az network vnet-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
@@ -14,21 +16,15 @@ az network vnet-gateway vpn-client generate `
   --output json `
   > $profileMetadata
 
-try {
-    if (-Not (Test-Path $profileMetadata)) {
-        throw "profile_metadata.json が生成されていません。"
+# If metadata JSON exists, proceed
+if (Test-Path $profileMetadata) {
+    $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
+
+    if (![string]::IsNullOrWhiteSpace($zipUrl)) {
+        Invoke-WebRequest -Uri $zipUrl -OutFile $profileZip
+    } else {
+        throw "profileUrl is empty. Failed to obtain ZIP URL from VPN Gateway."
     }
-
-    $json = Get-Content $profileMetadata | ConvertFrom-Json
-    $zipUrl = $json.profileUrl
-
-    if ([string]::IsNullOrWhiteSpace($zipUrl)) {
-        throw "profileUrl is empty. VPN Gateway から ZIP URL を取得できませんでした。"
-    }
-
-    Invoke-WebRequest -Uri $zipUrl -OutFile $profileZip
-}
-catch {
-    Write-Error $_
-    exit 1
+} else {
+    throw "profile_metadata.json not found. VPN Gateway profile metadata was not generated."
 }
