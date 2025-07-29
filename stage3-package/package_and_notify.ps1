@@ -1,6 +1,6 @@
 # === Path settings ===
-$certs        = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
-$vpnZip = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpn/vpnprofile.zip"
+$certs        = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs/certs"
+$vpnZip       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpn/vpnprofile.zip"
 $outDir       = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
 $unzipDir     = "$outDir/unzipped"
 $slackWebhook = $env:SLACK_WEBHOOK_URL
@@ -15,7 +15,7 @@ Write-Host ""
 Write-Host "=== [STEP] Creating output directory..."
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# === Debug: List VPN ZIP directory contents before checking existence ===
+# === Debug: List VPN ZIP directory contents ===
 $vpnDir = Split-Path $vpnZip
 Write-Host "=== [DEBUG] Listing contents of VPN directory: $vpnDir"
 Get-ChildItem -Recurse $vpnDir | ForEach-Object {
@@ -61,7 +61,7 @@ foreach ($pfx in $pfxList) {
     Write-Host "=== [PROCESS] User: $userName ==="
     Write-Host "PFX file path      : $($pfx.FullName)"
 
-    # === Find corresponding .azurevpn file ===
+    # === Find .azurevpn file ===
     $azurevpn = Get-ChildItem $unzipDir -Recurse -Filter "*.azurevpn" | Select-Object -First 1
     if (-not $azurevpn) {
         Write-Error "[ERROR] .azurevpn file not found in: $unzipDir"
@@ -69,16 +69,7 @@ foreach ($pfx in $pfxList) {
     }
     Write-Host ".azurevpn file path: $($azurevpn.FullName)"
 
-    # === Confirm both files exist and are readable ===
-    if (-not (Test-Path $pfx.FullName)) {
-        Write-Error "[ERROR] PFX file missing: $($pfx.FullName)"
-        continue
-    }
-    if (-not (Test-Path $azurevpn.FullName)) {
-        Write-Error "[ERROR] .azurevpn file missing: $($azurevpn.FullName)"
-        continue
-    }
-
+    # === Confirm both files are readable ===
     try {
         $null = Get-Content $pfx.FullName -ErrorAction Stop
         $null = Get-Content $azurevpn.FullName -ErrorAction Stop
@@ -94,7 +85,7 @@ foreach ($pfx in $pfxList) {
     Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
     Write-Host "[OK] Package created: $zipPath"
 
-    # === Send Slack notification ===
+    # === Slack notification ===
     if ($slackWebhook) {
         $payload = @{ text = "[OK] VPN package for $userName has been created." } | ConvertTo-Json -Compress
         Invoke-RestMethod -Uri $slackWebhook -Method POST -ContentType 'application/json' -Body $payload
