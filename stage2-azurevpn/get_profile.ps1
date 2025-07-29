@@ -14,14 +14,21 @@ az network vnet-gateway vpn-client generate `
   --output json `
   > $profileMetadata
 
-if (Test-Path $profileMetadata) {
-    $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
-
-    if (![string]::IsNullOrWhiteSpace($zipUrl)) {
-        Invoke-WebRequest -Uri $zipUrl -OutFile $profileZip
-    } else {
-        Write-Error "profileUrl is empty. VPN Gateway から ZIP URL を取得できませんでした。"
+try {
+    if (-Not (Test-Path $profileMetadata)) {
+        throw "profile_metadata.json が生成されていません。"
     }
-} else {
-    Write-Error "profile_metadata.json が生成されていません。"
+
+    $json = Get-Content $profileMetadata | ConvertFrom-Json
+    $zipUrl = $json.profileUrl
+
+    if ([string]::IsNullOrWhiteSpace($zipUrl)) {
+        throw "profileUrl is empty. VPN Gateway から ZIP URL を取得できませんでした。"
+    }
+
+    Invoke-WebRequest -Uri $zipUrl -OutFile $profileZip
+}
+catch {
+    Write-Error $_
+    exit 1
 }
