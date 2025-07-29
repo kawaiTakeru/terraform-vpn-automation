@@ -75,50 +75,55 @@ foreach ($pfx in $pfxList) {
 
     Write-Host "[INFO] Slack Webhook disabled. Notification skipped."
     Write-Host ""
-}
 
-# === [STEP] Slack DM test message ===
-Write-Host "=== [STEP] Sending Slack DM test message..."
+    # === [STEP] Slack ZIP file upload ===
+    Write-Host "=== [STEP] Uploading ZIP to Slack DM..."
 
-$token = $env:SLACK_BOT_TOKEN
-$email = "t-kawai@bfts.co.jp"
+    $token = $env:SLACK_BOT_TOKEN
+    $email = "t-kawai@bfts.co.jp"
 
-$response = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail" `
-    -Headers @{ Authorization = "Bearer $token" } `
-    -Method Get `
-    -Body @{ email = $email }
+    # ① Get Slack user ID
+    $userResp = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail" `
+        -Headers @{ Authorization = "Bearer $token" } `
+        -Method Get `
+        -Body @{ email = $email }
 
-if (-not $response.ok) {
-    Write-Error "[ERROR] Failed to lookup Slack user: $($response.error)"
-    exit 1
-}
+    if (-not $userResp.ok) {
+        Write-Error "[ERROR] Slack user lookup failed: $($userResp.error)"
+        continue
+    }
+    $userId = $userResp.user.id
+    Write-Host "[OK] Slack user ID: $userId"
 
-$userId = $response.user.id
-Write-Host "[OK] Found Slack user ID: $userId"
+    # ② Open DM channel
+    $dmResp = Invoke-RestMethod -Uri "https://slack.com/api/conversations.open" `
+        -Headers @{ Authorization = "Bearer $token" } `
+        -Method Post `
+        -ContentType "application/json" `
+        -Body (@{ users = $userId } | ConvertTo-Json -Depth 10)
 
-$dm = Invoke-RestMethod -Uri "https://slack.com/api/conversations.open" `
-    -Headers @{ Authorization = "Bearer $token" } `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body (@{ users = $userId } | ConvertTo-Json -Depth 10)
+    if (-not $dmResp.ok) {
+        Write-Error "[ERROR] Failed to open DM: $($dmResp.error)"
+        continue
+    }
+    $channelId = $dmResp.channel.id
+    Write-Host "[OK] DM channel: $channelId"
 
-if (-not $dm.ok) {
-    Write-Error "[ERROR] Failed to open DM: $($dm.error)"
-    exit 1
-}
+    # ③ Upload ZIP file to DM
+    $upload = Invoke-RestMethod -Uri "https://slack.com/api/files.upload" `
+        -Headers @{ Authorization = "Bearer $token" } `
+        -Method Post `
+        -Form @{
+            channels        = $channelId
+            file            = Get-Item $zipPath
+            filename        = [System.IO.Path]::GetFileName($zipPath)
+            title           = "VPN package for $userName"
+            initial_comment = "📦 Your VPN package is ready."
+        }
 
-$channelId = $dm.channel.id
-Write-Host "[OK] Opened DM channel: $channelId"
-
-$message = "✅ Slack DM test from Azure Pipeline (user: $email)"
-$response = Invoke-RestMethod -Uri "https://slack.com/api/chat.postMessage" `
-    -Headers @{ Authorization = "Bearer $token" } `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body (@{ channel = $channelId; text = $message } | ConvertTo-Json -Depth 10)
-
-if ($response.ok) {
-    Write-Host "[✅] Slack DM sent successfully to $email"
-} else {
-    Write-Error "[ERROR] Failed to send Slack DM: $($response.error)"
+    if ($upload.ok) {
+        Write-Host "[✅] Slack file uploaded to DM: $email"
+    } else {
+        Write-Error "[ERROR] Slack file upload failed: $($upload.error)"
+    }
 }
