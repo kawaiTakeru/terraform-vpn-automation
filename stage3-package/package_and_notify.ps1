@@ -72,11 +72,9 @@ foreach ($pfx in $pfxList) {
     Write-Host "Creating ZIP package : $zipPath"
     Compress-Archive -Path @($pfx.FullName, $azurevpn.FullName) -DestinationPath $zipPath -Force
     Write-Host "[OK] Package created : $zipPath"
-
-    Write-Host "[INFO] Slack Webhook disabled. Notification skipped."
     Write-Host ""
 
-    # === [STEP] Slack ZIP file upload ===
+    # === [STEP] Upload ZIP to Slack ===
     Write-Host "=== [STEP] Uploading ZIP to Slack DM..."
 
     $token = $env:SLACK_BOT_TOKEN
@@ -109,21 +107,31 @@ foreach ($pfx in $pfxList) {
     $channelId = $dmResp.channel.id
     Write-Host "[OK] DM channel: $channelId"
 
-    # ③ Upload ZIP file to DM
-    $upload = Invoke-RestMethod -Uri "https://slack.com/api/files.upload" `
-        -Headers @{ Authorization = "Bearer $token" } `
-        -Method Post `
-        -Form @{
-            channels        = $channelId
-            file            = Get-Item $zipPath
-            filename        = [System.IO.Path]::GetFileName($zipPath)
-            title           = "VPN package for $userName"
-            initial_comment = "📦 Your VPN package is ready."
-        }
+    # ③ Upload ZIP file using multipart/form-data
+    Write-Host "Uploading $zipPath to Slack via multipart/form-data..."
 
-    if ($upload.ok) {
+    $httpClient = New-Object System.Net.Http.HttpClient
+    $multipart = New-Object System.Net.Http.MultipartFormDataContent
+
+    $fileStream = [System.IO.File]::OpenRead($zipPath)
+    $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+    $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/zip")
+    $multipart.Add($fileContent, "file", [System.IO.Path]::GetFileName($zipPath))
+
+    $multipart.Add((New-Object System.Net.Http.StringContent($channelId)), "channels")
+    $multipart.Add((New-Object System.Net.Http.StringContent("VPN package for $userName")), "title")
+    $multipart.Add((New-Object System.Net.Http.StringContent("📦 Your VPN package is ready.")), "initial_comment")
+
+    $httpClient.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
+
+    $response = $httpClient.PostAsync("https://slack.com/api/files.upload", $multipart).Result
+    $content = $response.Content.ReadAsStringAsync().Result | ConvertFrom-Json
+
+    if ($content.ok) {
         Write-Host "[✅] Slack file uploaded to DM: $email"
     } else {
-        Write-Error "[ERROR] Slack file upload failed: $($upload.error)"
+        Write-Error "[ERROR] Slack file upload failed: $($content.error)"
     }
+
+    Write-Host ""
 }
