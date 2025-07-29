@@ -21,6 +21,7 @@ stages:
       inputs:
         targetType: filePath
         filePath: stage1-pfx/generate_cert.ps1
+        pwsh: true  # ✅ PowerShell 7 使用
 
     - task: PublishBuildArtifacts@1
       displayName: '📤 Publish PFX certs'
@@ -52,7 +53,7 @@ stages:
         ArtifactName: 'vpn'
         publishLocation: 'Container'
 
-# ③ ZIP化 & Slack通知（Webhook削除＋Slack Botトークン対応版）
+# ③ ZIP化 & Slack通知（Slack Botトークン使用・PowerShell 7 対応）
 - stage: Stage3_ZipAndNotify
   displayName: '③ ZIP化 & Slack通知'
   dependsOn: Stage2_AzureVPN
@@ -77,5 +78,6 @@ stages:
       inputs:
         targetType: filePath
         filePath: stage3-package/package_and_notify.ps1
+        pwsh: true  # ✅ PowerShell 7 使用
       env:
-        SLACK_BOT_TOKEN: $(SLACK_BOT_TOKEN)  # ✅ 追加：Slack API トークンを環境変数で渡す
+        SLACK_BOT_TOKEN: $(SLACK_BOT_TOKEN)  # ✅ Slack Bot トークンを環境変数で渡す
