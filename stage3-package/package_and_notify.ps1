@@ -1,8 +1,8 @@
-# ✅ 修正点：$env:BUILD_ARTIFACTSTAGINGDIRECTORY を使用
+# ✅ 各パスに BUILD_ARTIFACTSTAGINGDIRECTORY を使用
 $certs   = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/certs"
 $vpnZip  = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn/vpnprofile.zip"
 $outDir  = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/output"
-$slackWebhook = $env:SLACK_WEBHOOK_URL  # ← Secret として登録されている前提
+$slackWebhook = $env:SLACK_WEBHOOK_URL  # ← Secret として事前に登録
 
 # 🔧 準備
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
