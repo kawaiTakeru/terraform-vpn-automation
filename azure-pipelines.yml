@@ -2,31 +2,51 @@ trigger: none
 pr: none
 
 pool:
-  name: Default  # ← Self-hosted Agent を指定（名前は環境に合わせて）
+  name: Default  # ← ご自身の Self-hosted Agent 名に合わせて
 
 variables:
-  TF_VERSION: '1.6.6'
-  TF_DIRECTORY: 'stage1-peering'
+  - name: System.Debug
+    value: 'true'
+  - name: SLACK_WEBHOOK_URL
+    value: $(SLACK_WEBHOOK_URL)  # ← パイプラインに Secret 登録されている前提
 
 stages:
-- stage: Stage1_Peering
-  displayName: 'VNet Peering Setup'
+- stage: Stage1_PFX
+  displayName: '① PFX証明書生成'
   jobs:
-  - job: TerraformApply
-    displayName: 'Apply Peering Configuration'
+  - job: GeneratePFX
+    displayName: 'OpenSSLで.taro.pfx作成'
     steps:
-    - task: UsePythonVersion@0
+    - task: PowerShell@2
+      displayName: 'Generate .pfx from vars.json'
       inputs:
-        versionSpec: '3.x'
-    
-    - task: TerraformInstaller@1
+        targetType: filePath
+        filePath: stage1-pfx/generate_cert.ps1
+
+- stage: Stage2_AzureVPN
+  displayName: '② Azure VPN設定ファイル取得'
+  dependsOn: Stage1_PFX
+  jobs:
+  - job: GetAzureVPN
+    displayName: 'VPN Gatewayから .azurevpn ZIPを取得'
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Get VPN profile ZIP via Azure CLI'
       inputs:
-        terraformVersion: '$(TF_VERSION)'
+        azureSubscription: '<ServiceConnectionName>'  # ⚠️ Azureへのサービス接続名に変更
+        scriptType: ps
+        scriptLocation: scriptPath
+        scriptPath: stage2-azurevpn/get_profile.ps1
 
-    - script: |
-        cd $(TF_DIRECTORY)
-        terraform init
-        terraform plan -out=tfplan
-        terraform apply -auto-approve tfplan
-      displayName: 'Terraform Init/Plan/Apply'
-
+- stage: Stage3_ZipAndNotify
+  displayName: '③ ZIP化 & Slack通知'
+  dependsOn: Stage2_AzureVPN
+  jobs:
+  - job: NotifySlack
+    displayName: 'pfx + .azurevpn を ZIP にまとめて通知'
+    steps:
+    - task: PowerShell@2
+      displayName: 'Package and Notify'
+      inputs:
+        targetType: filePath
+        filePath: stage3-package/package_and_notify.ps1
