@@ -1,5 +1,3 @@
-# VPN profile ZIP 取得スクリプト
-
 $resourceGroup = "rg-test-hubnw-prd-jpe-001"
 $gatewayName = "vpngw-test-hubnw-prd-jpe-001"
 $outputDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn"
