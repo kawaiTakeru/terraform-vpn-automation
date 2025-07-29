@@ -22,6 +22,14 @@ stages:
         targetType: filePath
         filePath: stage1-pfx/generate_cert.ps1
 
+    # ✅ 追加：Stage3用にPFXを公開
+    - task: PublishBuildArtifacts@1
+      displayName: '📤 Publish PFX certs'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/certs'
+        ArtifactName: 'certs'
+        publishLocation: 'Container'
+
 # ② Azure VPN設定ファイル取得
 - stage: Stage2_AzureVPN
   displayName: '② Azure VPN設定ファイル取得'
@@ -54,7 +62,14 @@ stages:
   - job: NotifySlack
     displayName: 'pfx + .azurevpn を ZIP にまとめて通知'
     steps:
-    # ✅ 修正済：ダウンロード先を StagingDirectory に統一
+    # ✅ 追加：PFXもダウンロード
+    - task: DownloadBuildArtifacts@0
+      displayName: '📥 Download PFX artifact'
+      inputs:
+        artifactName: 'certs'
+        downloadPath: '$(Build.ArtifactStagingDirectory)/certs'
+
+    # ✅ 修正済：VPN ZIPをダウンロード
     - task: DownloadBuildArtifacts@0
       displayName: '📥 Download VPN artifact'
       inputs:
