@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 # 拡張機能追加（既にある場合はスキップされる）
 az extension add --name vpn-gateway --only-show-errors
 
-# VPN クライアント構成メタデータ取得（JSON に profileUrl 含まれる）
+# VPN クライアント構成メタデータ取得
 az network vpn-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
@@ -24,12 +24,10 @@ if (Test-Path $profileMetadata) {
     $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
 
     if (![string]::IsNullOrWhiteSpace($zipUrl)) {
-        # ZIPをダウンロード
         Invoke-WebRequest -Uri $zipUrl -OutFile $profileZip
     } else {
         Write-Error "profileUrl is empty. VPN Gateway から ZIP URL を取得できませんでした。"
     }
-
 } else {
     Write-Error "profile_metadata.json が生成されていません。"
 }
