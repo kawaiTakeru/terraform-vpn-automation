@@ -1,4 +1,4 @@
-﻿$resourceGroup = "rg-test-hubnw-prd-jpe-001"
+$resourceGroup = "rg-test-hubnw-prd-jpe-001"
 $gatewayName = "vpngw-test-hubnw-prd-jpe-001"
 $outputDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn"
 $profileMetadata = "$outputDir/profile_metadata.json"
@@ -7,12 +7,7 @@ $profileZip = "$outputDir/vpnprofile.zip"
 # 出力先フォルダ作成
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-# VPN クライアント構成メタデータ取得
-<<<<<<< HEAD
-=======
 # VPN クライアント構成メタデータ取得（profileUrl が含まれる JSON）
-=======
->>>>>>> 22326ac (一時コミット: rebase のため)
 az network vnet-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
