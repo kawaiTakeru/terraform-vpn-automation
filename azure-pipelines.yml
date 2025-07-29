@@ -33,7 +33,7 @@ stages:
     - task: AzureCLI@2
       displayName: 'Get VPN profile ZIP via Azure CLI'
       inputs:
-        azureSubscription: '<ServiceConnectionName>'  # ⚠️ Azureへのサービス接続名に変更
+        azureSubscription: 'AzureRM-vpn-connection'  # ⚠️ Azureへのサービス接続名に変更
         scriptType: ps
         scriptLocation: scriptPath
         scriptPath: stage2-azurevpn/get_profile.ps1
