@@ -8,8 +8,11 @@ $profileZip = "$outputDir/vpnprofile.zip"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
 # VPN クライアント構成メタデータ取得
+<<<<<<< HEAD
 =======
 # VPN クライアント構成メタデータ取得（profileUrl が含まれる JSON）
+=======
+>>>>>>> 22326ac (一時コミット: rebase のため)
 az network vnet-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
@@ -18,7 +21,7 @@ az network vnet-gateway vpn-client generate `
   --output json `
   > $profileMetadata
 
-# JSON が存在していれば処理続行
+# JSON が存在していれば処理実行
 if (Test-Path $profileMetadata) {
     $zipUrl = (Get-Content $profileMetadata | ConvertFrom-Json).profileUrl
 
