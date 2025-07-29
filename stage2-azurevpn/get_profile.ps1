@@ -1,13 +1,12 @@
 $resourceGroup = "rg-test-hubnw-prd-jpe-001"
-$gatewayName = "vpngw-test-hubnw-prd-jpe-001"
+$gatewayName = "vnet-gateway"
 $outputDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY/vpn"
 $profileMetadata = "$outputDir/profile_metadata.json"
 $profileZip = "$outputDir/vpnprofile.zip"
 
-# Create output directory
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-# Generate VPN client profile metadata JSON
+# Generate VPN client configuration metadata (includes profileUrl)
 az network vnet-gateway vpn-client generate `
   --resource-group $resourceGroup `
   --name $gatewayName `
@@ -16,7 +15,7 @@ az network vnet-gateway vpn-client generate `
   --output json `
   > $profileMetadata
 
-# Check result and download ZIP
+# Validate and download VPN profile ZIP
 try {
     if (-Not (Test-Path $profileMetadata)) {
         throw "profile_metadata.json was not generated."
