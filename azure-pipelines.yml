@@ -54,7 +54,7 @@ stages:
   - job: NotifySlack
     displayName: 'pfx + .azurevpn を ZIP にまとめて通知'
     steps:
-    # ✅ 追加：ZIPアーティファクトをダウンロード
+    # ✅ 修正済：ダウンロード先を StagingDirectory に統一
     - task: DownloadBuildArtifacts@0
       displayName: '📥 Download VPN artifact'
       inputs:
