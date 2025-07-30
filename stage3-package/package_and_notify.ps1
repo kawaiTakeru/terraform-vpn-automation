@@ -28,7 +28,7 @@ if (-not $pfxList) {
 
 # === Slack Setup ===
 $token = $env:SLACK_BOT_TOKEN
-$json  = Get-Content "$env:BUILD_SOURCESDIRECTORY/stage1-pfx/vars.json" | ConvertFrom-Json
+$json  = Get-Content "$env:BUILD_SOURCESDIRECTORY/stage1‑pfx/vars.json" | ConvertFrom-Json
 
 foreach ($user in $json.users) {
     $userName = $user.name
@@ -45,10 +45,10 @@ foreach ($user in $json.users) {
     Compress-Archive -Path @($pfx, $vpnXml) -DestinationPath $zipPath -Force
     Write-Host "[OK] Created: $zipPath"
 
-    # Step 1: getUploadURLExternal
+    # === Step 1: getUploadURLExternal ===
     $uploadReq = @{
-        filename = "${userName}_vpn_package.zip"
-        length   = (Get-Item $zipPath).Length
+        filename = "${userName}_vpn_package.zip"   # ✅ 正しいキー名 (API仕様通り)
+        length   = (Get-Item $zipPath).Length      # ✅ バイト数で指定
     }
     $uploadJson = $uploadReq | ConvertTo-Json -Depth 10 -Compress
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
@@ -67,52 +67,53 @@ foreach ($user in $json.users) {
     $uploadUrl = $uploadResp.upload_url
     $fileId    = $uploadResp.file_id
 
-    # Step 2: Upload file binary
+    # === Step 2: Upload file binary ===
     $bin = [System.IO.File]::ReadAllBytes($zipPath)
-    Invoke-RestMethod -Uri $uploadUrl -Method PUT -Body $bin -ContentType "application/octet-stream"
+    Invoke-RestMethod -Uri $uploadUrl -Method PUT -Body $bin -ContentType "application/zip"
 
-    # Step 3: completeUploadExternal
+    # === Step 3: completeUploadExternal ===
     $completeReq = @{
-        files = @(@{
-            id    = $fileId
-            title = "$userName VPN Package"
-        })
-        # 例: channel_id とコメントを添えることも可能
-        # channel_id = $yourChannelId
-        # initial_comment = "VPN package for $userName"
-    } | ConvertTo-Json -Depth 10
+        files = @(@{ id = $fileId; title = "$userName VPN Package" })
+        channel_id = $channelId
+    }
+    $completeJson = $completeReq | ConvertTo-Json -Depth 10 -Compress
     $completeResp = Invoke-RestMethod -Uri "https://slack.com/api/files.completeUploadExternal" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method POST `
         -ContentType "application/json" `
-        -Body $completeReq
+        -Body $completeJson
 
     if (-not $completeResp.ok) {
         Write-Error "[ERROR] Complete upload failed: $($completeResp.error)"
         continue
     }
 
-    # Open and post DM
+    # === Lookup user and open DM ===
     $userResp = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail?email=$email" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method GET
+
     if (-not $userResp.ok) {
         Write-Error "[ERROR] User lookup failed: $($userResp.error)"
         continue
     }
 
     $userId = $userResp.user.id
+
     $dmResp = Invoke-RestMethod -Uri "https://slack.com/api/conversations.open" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method POST `
         -ContentType "application/json" `
         -Body (@{ users = $userId } | ConvertTo-Json -Depth 10)
+
     if (-not $dmResp.ok) {
         Write-Error "[ERROR] DM open failed: $($dmResp.error)"
         continue
     }
 
     $channelId = $dmResp.channel.id
+
+    # === Step 4: Send message with link ===
     $msg = @{
         channel     = $channelId
         text        = ":package: VPN package for *$userName* is ready!"
