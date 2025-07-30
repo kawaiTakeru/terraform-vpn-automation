@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 # === Extract ZIP ===
 if (-not (Test-Path $vpnZip)) {
-    Write-Error "VPN ZIP missing: $vpnZip"
+    Write-Error "[ERROR] VPN ZIP missing: $vpnZip"
     exit 1
 }
 Expand-Archive -Path $vpnZip -DestinationPath $unzipDir -Force
@@ -22,7 +22,7 @@ Expand-Archive -Path $vpnZip -DestinationPath $unzipDir -Force
 # === Find PFX ===
 $pfxList = Get-ChildItem "$certs/*.pfx"
 if (-not $pfxList) {
-    Write-Error "No PFX found in: $certs"
+    Write-Error "[ERROR] No PFX found in: $certs"
     exit 1
 }
 
@@ -35,19 +35,24 @@ foreach ($user in $json.users) {
     $email = $user.email
     $pfx = "$certs/$userName.pfx"
     $vpnXml = "$unzipDir/AzureVPN/azurevpnconfig.xml"
-    if (-not (Test-Path $pfx) -or -not (Test-Path $vpnXml)) { continue }
+
+    if (-not (Test-Path $pfx) -or -not (Test-Path $vpnXml)) {
+        Write-Warning "[SKIP] Missing .pfx or .xml for user: $userName"
+        continue
+    }
 
     $zipPath = "$outDir/${userName}_vpn_package.zip"
     Compress-Archive -Path @($pfx, $vpnXml) -DestinationPath $zipPath -Force
     Write-Host "[OK] Created: $zipPath"
 
     # === Step 1: getUploadURLExternal ===
-    $uploadReq = @"
-{
-    "filename": "$($userName).zip",
-    "length": $(Get-Item $zipPath).Length
-}
-"@
+    $fileLength = (Get-Item $zipPath).Length
+    $uploadReq = @{
+        filename = "$userName.zip"
+        length   = $fileLength
+    } | ConvertTo-Json -Depth 5
+
+    Write-Host "→ [DEBUG] Upload request payload: $uploadReq"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
         -Headers @{ Authorization = "Bearer $token" } `
@@ -56,16 +61,18 @@ foreach ($user in $json.users) {
         -Body $uploadReq
 
     if (-not $uploadResp.ok) {
-        Write-Error "Upload URL request failed: $($uploadResp.error)"
+        Write-Error "[ERROR] Upload URL request failed: $($uploadResp.error)"
         continue
     }
 
     $uploadUrl = $uploadResp.upload_url
     $fileId = $uploadResp.file_id
+    Write-Host "[OK] Got Upload URL & File ID"
 
     # === Step 2: Upload file binary ===
     $bin = [System.IO.File]::ReadAllBytes($zipPath)
     Invoke-RestMethod -Uri $uploadUrl -Method PUT -Body $bin -ContentType "application/zip"
+    Write-Host "[OK] File uploaded via PUT"
 
     # === Step 3: completeUploadExternal ===
     $completeReq = @{
@@ -82,9 +89,12 @@ foreach ($user in $json.users) {
         -Body $completeReq
 
     if (-not $completeResp.ok) {
-        Write-Error "Complete upload failed: $($completeResp.error)"
+        Write-Error "[ERROR] Complete upload failed: $($completeResp.error)"
         continue
     }
+
+    $permalink = $completeResp.files[0].permalink
+    Write-Host "[OK] Upload completed. Permalink: $permalink"
 
     # === Lookup user and open DM ===
     $userResp = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail" `
@@ -93,12 +103,11 @@ foreach ($user in $json.users) {
         -Body @{ email = $email }
 
     if (-not $userResp.ok) {
-        Write-Error "User lookup failed: $($userResp.error)"
+        Write-Error "[ERROR] User lookup failed: $($userResp.error)"
         continue
     }
 
     $userId = $userResp.user.id
-
     $dmResp = Invoke-RestMethod -Uri "https://slack.com/api/conversations.open" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method POST `
@@ -106,7 +115,7 @@ foreach ($user in $json.users) {
         -Body (@{ users = $userId } | ConvertTo-Json -Depth 10)
 
     if (-not $dmResp.ok) {
-        Write-Error "DM open failed: $($dmResp.error)"
+        Write-Error "[ERROR] DM open failed: $($dmResp.error)"
         continue
     }
 
@@ -118,7 +127,7 @@ foreach ($user in $json.users) {
         text    = ":package: VPN package for *$userName* is ready!"
         attachments = @(@{
             title = "$userName VPN Package"
-            title_link = $completeResp.files[0].permalink
+            title_link = $permalink
         })
     } | ConvertTo-Json -Depth 10
 
