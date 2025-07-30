@@ -35,14 +35,18 @@ foreach ($user in $json.users) {
     $email    = $user.email
     $pfx      = "$certs/$userName.pfx"
     $vpnXml   = "$unzipDir/AzureVPN/azurevpnconfig.xml"
-    if (-not (Test-Path $pfx) -or -not (Test-Path $vpnXml)) { continue }
+
+    if (-not (Test-Path $pfx) -or -not (Test-Path $vpnXml)) {
+        Write-Warning "Skipping $userName (missing files)"
+        continue
+    }
 
     $zipPath = "$outDir/${userName}_vpn_package.zip"
     Compress-Archive -Path @($pfx, $vpnXml) -DestinationPath $zipPath -Force
     Write-Host "[OK] Created: $zipPath"
 
     # === Step 1: getUploadURLExternal ===
-    $filename = "$userName.zip"
+    $filename = "${userName}_vpn_package.zip"
     $length   = [int64](Get-Item $zipPath).Length
 
     $uploadJson = @"
@@ -51,6 +55,7 @@ foreach ($user in $json.users) {
   "length": $length
 }
 "@
+
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
@@ -91,10 +96,9 @@ foreach ($user in $json.users) {
     }
 
     # === Lookup user and open DM ===
-    $userResp = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail" `
+    $userResp = Invoke-RestMethod -Uri "https://slack.com/api/users.lookupByEmail?email=$email" `
         -Headers @{ Authorization = "Bearer $token" } `
-        -Method GET `
-        -Body @{ email = $email }
+        -Method GET
 
     if (-not $userResp.ok) {
         Write-Error "[ERROR] User lookup failed: $($userResp.error)"
