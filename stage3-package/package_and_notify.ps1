@@ -44,9 +44,9 @@ foreach ($user in $json.users) {
     # === Step 1: getUploadURLExternal ===
     $uploadReq = @{
         filename = "$userName.zip"
-        length   = (Get-Item $zipPath).Length
+        length   = [int64](Get-Item $zipPath).Length
     }
-    $uploadJson = $uploadReq | ConvertTo-Json -Depth 5
+    $uploadJson = $uploadReq | ConvertTo-Json -Depth 5 -Compress
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
