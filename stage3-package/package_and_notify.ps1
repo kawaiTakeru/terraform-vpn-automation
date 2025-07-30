@@ -50,7 +50,7 @@ foreach ($user in $json.users) {
         filename = "${userName}_vpn_package.zip"
         length   = (Get-Item $zipPath).Length  # ✅ 修正箇所
     }
-    $uploadJson = [System.Text.Json.JsonSerializer]::Serialize($uploadReq)
+    $uploadJson = $uploadReq | ConvertTo-Json -Depth 10 -Compress
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
