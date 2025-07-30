@@ -32,9 +32,9 @@ $json  = Get-Content "$env:BUILD_SOURCESDIRECTORY/stage1-pfx/vars.json" | Conver
 
 foreach ($user in $json.users) {
     $userName = $user.name
-    $email = $user.email
-    $pfx = "$certs/$userName.pfx"
-    $vpnXml = "$unzipDir/AzureVPN/azurevpnconfig.xml"
+    $email    = $user.email
+    $pfx      = "$certs/$userName.pfx"
+    $vpnXml   = "$unzipDir/AzureVPN/azurevpnconfig.xml"
     if (-not (Test-Path $pfx) -or -not (Test-Path $vpnXml)) { continue }
 
     $zipPath = "$outDir/${userName}_vpn_package.zip"
@@ -42,17 +42,21 @@ foreach ($user in $json.users) {
     Write-Host "[OK] Created: $zipPath"
 
     # === Step 1: getUploadURLExternal ===
-    $uploadReq = @{
-        filename = "$userName.zip"
-        length   = [int64](Get-Item $zipPath).Length
-    }
-    $uploadJson = $uploadReq | ConvertTo-Json -Depth 5 -Compress
+    $filename = "$userName.zip"
+    $length   = [int64](Get-Item $zipPath).Length
+
+    $uploadJson = @"
+{
+  "filename": "$filename",
+  "length": $length
+}
+"@
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method POST `
-        -ContentType "application/json" `
+        -ContentType "application/json; charset=utf-8" `
         -Body $uploadJson
 
     if (-not $uploadResp.ok) {
