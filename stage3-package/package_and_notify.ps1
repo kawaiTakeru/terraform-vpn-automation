@@ -46,22 +46,17 @@ foreach ($user in $json.users) {
     Write-Host "[OK] Created: $zipPath"
 
     # === Step 1: getUploadURLExternal ===
-    $filename = "${userName}_vpn_package.zip"
-    $length   = [int64](Get-Item $zipPath).Length
-
-    $uploadJson = @"
-{
-  "filename": "$filename",
-  "length": $length
-}
-"@
-
+    $uploadReq = @{
+        filename = "${userName}_vpn_package.zip"
+        length   = [int64](Get-Item $zipPath).Length
+    }
+    $uploadJson = $uploadReq | ConvertTo-Json -Depth 10 -Compress
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
 
     $uploadResp = Invoke-RestMethod -Uri "https://slack.com/api/files.getUploadURLExternal" `
         -Headers @{ Authorization = "Bearer $token" } `
         -Method POST `
-        -ContentType "application/json; charset=utf-8" `
+        -ContentType "application/json" `
         -Body $uploadJson
 
     if (-not $uploadResp.ok) {
