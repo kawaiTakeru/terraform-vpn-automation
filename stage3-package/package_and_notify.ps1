@@ -47,7 +47,7 @@ foreach ($user in $json.users) {
 
     # === Step 1: getUploadURLExternal ===
     $uploadReq = @{
-        file_name = "${userName}_vpn_package.zip"
+        filename = "${userName}_vpn_package.zip"
         length    = [int64](Get-Item $zipPath).Length
     }
     $uploadJson = $uploadReq | ConvertTo-Json -Depth 10 -Compress
