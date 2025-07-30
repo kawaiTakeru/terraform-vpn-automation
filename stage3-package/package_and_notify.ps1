@@ -48,7 +48,7 @@ foreach ($user in $json.users) {
     # === Step 1: getUploadURLExternal ===
     $uploadReq = [PSCustomObject]@{
         filename = "${userName}_vpn_package.zip"
-        length   = [System.IO.File]::GetLength($zipPath)
+        length   = (Get-Item $zipPath).Length  # ✅ 修正箇所
     }
     $uploadJson = [System.Text.Json.JsonSerializer]::Serialize($uploadReq)
     Write-Host "→ [DEBUG] Upload request payload: $uploadJson"
